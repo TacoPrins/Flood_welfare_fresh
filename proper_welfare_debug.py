@@ -9,8 +9,6 @@ import numpy as np
 import misc_functions as misc
 import household_problem_epsilons_nolearning as household_problem  
 import simulation as sim
-import equilibrium as equil
-import simulate_initial_joint as initial_joint_sim
 from numba import njit
 import LoM_epsilons as lom
 
@@ -28,6 +26,7 @@ def find_expenditure_equiv_EK_SLR(par, grids, vCoeff_C_initial, vCoeff_NC_initia
     v_nonowner_wf_expanded_SLR=grid_adjust_rentshape(par,grids,v_nonowner_wf)
     v_owner_c_wf_expanded_SLR=grid_adjust(par,grids,v_owner_c_wf)
     v_owner_nc_wf_expanded_SLR=grid_adjust(par,grids,v_owner_nc_wf)
+    
 
     wf_loss = np.linspace(-0.02, 0.05,10)
     
@@ -236,23 +235,11 @@ def find_expenditure_equiv_EK_policy(par, grids, vCoeff_C_in, vCoeff_NC_in,vCoef
 
     # get value functions over transition with experiment
     t_pol = int((par.experiment_year-par.starting_year)/par.time_increment)                                                                                                                                                                                                                                                        
-    _, _, _, _, _, _, v_owner_c_wf_MP, v_owner_nc_wf_MP, v_nonowner_wf_MP = household_problem.solve(grids, par, vCoeff_C_MP_in,vCoeff_NC_MP_in, config_MP)
-    _, _, _, _, _, _, v_owner_c_wf_BR, v_owner_nc_wf_BR, v_nonowner_wf_BR = household_problem.solve(grids, par, vCoeff_C_BR_in,vCoeff_NC_BR_in, config_BR)
-    v_owner_c_wf_expanded_MP=grid_adjust(par,grids,v_owner_c_wf_MP)
-    del v_owner_c_wf_MP
-    v_owner_nc_wf_expanded_MP=grid_adjust(par,grids,v_owner_nc_wf_MP)
-    del v_owner_nc_wf_MP
-    v_nonowner_wf_expanded_MP=grid_adjust_rentshape(par,grids,v_nonowner_wf_MP)
-    del v_nonowner_wf_MP
-    v_owner_c_wf_expanded_BR=grid_adjust(par,grids,v_owner_c_wf_BR)
-    del v_owner_c_wf_BR
-    v_owner_nc_wf_expanded_BR=grid_adjust(par,grids,v_owner_nc_wf_BR)
-    del v_owner_nc_wf_BR
-    v_nonowner_wf_expanded_BR=grid_adjust_rentshape(par,grids,v_nonowner_wf_BR)
-    del v_nonowner_wf_BR
 
     
-    wf_loss = np.linspace(-0.1, 0.15,25)
+
+    
+    wf_loss = np.linspace(-0.1, 0.15,10)
     
     ce_C_BR  = np.zeros((wf_loss.size,k_dim, grids.vE.size))
     ce_NC_BR = np.zeros((wf_loss.size,k_dim, grids.vE.size))
@@ -271,7 +258,15 @@ def find_expenditure_equiv_EK_policy(par, grids, vCoeff_C_in, vCoeff_NC_in,vCoef
     wf_BR_pol_c   =np.zeros((k_dim,grids.vE.size))
     wf_BR_pol_nc  =np.zeros((k_dim,grids.vE.size))
     wf_BR_pol_rent=np.zeros((k_dim,grids.vE.size))
-    wf_BR_pol_newborns=np.zeros((grids.vTime.size,k_dim,grids.vE.size))    
+    wf_BR_pol_newborns=np.zeros((grids.vTime.size,k_dim,grids.vE.size))   
+    
+    _, _, _, _, _, _, v_owner_c_wf_MP, v_owner_nc_wf_MP, v_nonowner_wf_MP = household_problem.solve(grids, par, vCoeff_C_MP_in,vCoeff_NC_MP_in, config_MP)
+    v_owner_c_wf_expanded_MP=grid_adjust(par,grids,v_owner_c_wf_MP)
+    del v_owner_c_wf_MP
+    v_owner_nc_wf_expanded_MP=grid_adjust(par,grids,v_owner_nc_wf_MP)
+    del v_owner_nc_wf_MP
+    v_nonowner_wf_expanded_MP=grid_adjust_rentshape(par,grids,v_nonowner_wf_MP)
+    del v_nonowner_wf_MP
    
     for k_index in range(k_dim):
         for e_index in range(grids.vE.size):
@@ -279,23 +274,42 @@ def find_expenditure_equiv_EK_policy(par, grids, vCoeff_C_in, vCoeff_NC_in,vCoef
             wf_MP_pol_nc[k_index,e_index] = np.sum(mDist1_nc_2026[1:,k_index, :, :,:,:,e_index]* v_owner_nc_wf_expanded_MP[t_pol,1:,k_index, :, :,:,:,e_index])
             wf_MP_pol_rent[k_index,e_index] = np.sum(mDist1_renter_2026[:,k_index, :, :,e_index]* v_nonowner_wf_expanded_MP[t_pol,:,k_index, :, :,e_index])
     del v_owner_c_wf_expanded_MP, v_owner_nc_wf_expanded_MP
-    for k_index in range(k_dim):
-        for e_index in range(grids.vE.size):
-            wf_BR_pol_c[k_index,e_index] = np.sum(mDist1_c_2026[1:,k_index, :, :,:,:,e_index]* v_owner_c_wf_expanded_BR[t_pol,1:,k_index, :, :,:,:,e_index])
-            wf_BR_pol_nc[k_index,e_index] = np.sum(mDist1_nc_2026[1:,k_index, :, :,:,:,e_index]* v_owner_nc_wf_expanded_BR[t_pol,1:,k_index, :, :,:,:,e_index])
-            wf_BR_pol_rent[k_index,e_index] = np.sum(mDist1_renter_2026[:,k_index, :, :,e_index]* v_nonowner_wf_expanded_BR[t_pol,:,k_index, :, :,e_index])
-    del v_owner_c_wf_expanded_BR, v_owner_nc_wf_expanded_BR
-
+    
     for t_index in range(t_pol, grids.vTime.size-1):
         newborn_dist = sim.gen_initial_dist(par, grids, t_index, dP_C_lom[t_index], dP_NC_lom[t_index], vcoastal_beq[t_index], vnoncoastal_beq[t_index], vsavings_beq[t_index], config_nopol.sceptics)
         # weight
         for k_index in range(k_dim):
             for e_index in range(grids.vE.size):
                 # NOTE HERE: Size wf_pol_newborns is grids.vTime.size. It starts fillling here from 14, until grids.vTime.size
-                wf_MP_pol_newborns[t_index,k_index,e_index] = np.sum(newborn_dist[k_index,:,:,e_index] * v_nonowner_wf_expanded_MP[t_index,0,k_index, :, :,e_index])
-                wf_BR_pol_newborns[t_index,k_index,e_index] = np.sum(newborn_dist[k_index,:,:,e_index] * v_nonowner_wf_expanded_BR[t_index,0,k_index, :, :,e_index])
-    del v_nonowner_wf_expanded_MP, v_nonowner_wf_expanded_BR
+                wf_MP_pol_newborns[t_index,k_index,e_index] = np.sum(newborn_dist[k_index,:,:,e_index] * v_nonowner_wf_expanded_MP[t_index,0,k_index, :, :,e_index])                
+    del v_nonowner_wf_expanded_MP
 
+    _, _, _, _, _, _, v_owner_c_wf_BR, v_owner_nc_wf_BR, v_nonowner_wf_BR = household_problem.solve(grids, par, vCoeff_C_BR_in,vCoeff_NC_BR_in, config_BR)
+    v_owner_c_wf_expanded_BR=grid_adjust(par,grids,v_owner_c_wf_BR)
+    del v_owner_c_wf_BR
+    v_owner_nc_wf_expanded_BR=grid_adjust(par,grids,v_owner_nc_wf_BR)
+    del v_owner_nc_wf_BR
+    v_nonowner_wf_expanded_BR=grid_adjust_rentshape(par,grids,v_nonowner_wf_BR)
+    del v_nonowner_wf_BR
+        
+    
+    for k_index in range(k_dim):
+        for e_index in range(grids.vE.size):
+            wf_BR_pol_c[k_index,e_index] = np.sum(mDist1_c_2026[1:,k_index, :, :,:,:,e_index]* v_owner_c_wf_expanded_BR[t_pol,1:,k_index, :, :,:,:,e_index])
+            wf_BR_pol_nc[k_index,e_index] = np.sum(mDist1_nc_2026[1:,k_index, :, :,:,:,e_index]* v_owner_nc_wf_expanded_BR[t_pol,1:,k_index, :, :,:,:,e_index])
+            wf_BR_pol_rent[k_index,e_index] = np.sum(mDist1_renter_2026[:,k_index, :, :,e_index]* v_nonowner_wf_expanded_BR[t_pol,:,k_index, :, :,e_index])
+    del v_owner_c_wf_expanded_BR, v_owner_nc_wf_expanded_BR
+    
+    for t_index in range(t_pol, grids.vTime.size-1):
+        newborn_dist = sim.gen_initial_dist(par, grids, t_index, dP_C_lom[t_index], dP_NC_lom[t_index], vcoastal_beq[t_index], vnoncoastal_beq[t_index], vsavings_beq[t_index], config_nopol.sceptics)
+        # weight
+        for k_index in range(k_dim):
+            for e_index in range(grids.vE.size):
+                # NOTE HERE: Size wf_pol_newborns is grids.vTime.size. It starts fillling here from 14, until grids.vTime.size                
+                wf_BR_pol_newborns[t_index,k_index,e_index] = np.sum(newborn_dist[k_index,:,:,e_index] * v_nonowner_wf_expanded_BR[t_index,0,k_index, :, :,e_index])
+    del v_nonowner_wf_expanded_BR
+
+    
     for wf_idx in range(wf_loss.size):
         par.wf_wedge[0] = wf_loss[wf_idx]
         _, _, _, _, _, _, v_owner_c_wf_BAU, v_owner_nc_wf_BAU, v_nonowner_wf_BAU = household_problem.solve(grids, par, vCoeff_C_in,vCoeff_NC_in, config_nopol)

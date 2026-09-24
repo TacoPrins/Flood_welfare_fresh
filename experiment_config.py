@@ -1,11 +1,11 @@
 solve_initial_ss_HE = {'sceptics': True,                    
-                    'welfare': False,
+                    'welfare': True,
                     'building_rest': False,
                     'mortgage_premium': False,
                     'initial': True}
 
 solve_initial_ss_RE = {'sceptics': False,                    
-                    'welfare': False,
+                    'welfare': True,
                     'building_rest': False,
                     'mortgage_premium': False,
                     'initial': True}

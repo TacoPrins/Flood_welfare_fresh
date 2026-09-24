@@ -37,6 +37,7 @@ def calibration_check():
     homeownership_young_model = HO_C_share_before35 + HO_NC_share_before35
     med_housing_model = median_housing
     
+    
   
     
     # DATA MOMENTS
@@ -52,9 +53,13 @@ def calibration_check():
     print('NW_decay_data', NW_decay_model, 'data:', NW_decay_data)
     print('bequest_ineq_data', bequest_ineq_model, 'data:', bequest_ineq_data)
     print('homeownership', homeownership_model, 'data:', homeownership)
-    print('total_saving_model', price_diff_model, 'data:', price_diff)
+    print('price_discount', price_diff_model, 'data:', price_diff)
     print('homeownership_young_model', homeownership_young_model, 'data:', homeownership_young)
     print('med_housing_model', med_housing_model, 'data:', med_housing)
+    print('homeownership_death',HO_C_share_death+HO_NC_share_death)
+    print('tenth_percentile_housing',tenth_percentile_housing)
+    print('ninetieth_percentile_housing',ninetieth_percentile_housing)
+    print('mean_NW',total_NW_all_ages)
     
 
     
