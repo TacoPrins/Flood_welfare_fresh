@@ -133,7 +133,6 @@ def excess_demand_continuous(use_stock_clearing, grids, par, t_index, mDist0_c, 
     dP_NC_prime_lom=dP_NC_lom+dP_NC_growth_prime_lom
     
     
-    #THIS IS CUMULATIVE OVER TIME INTERVAL WHEREAS INT RATE IS YEARLY
     coastal_damage_frac=grids.vPi_S_median[t_index]*np.dot(grids.vPDF_z[1:],(1-grids.vZ[1:]))
     
     rental_price_C=par.dPsi+max(dP_C-(1-par.dDelta-coastal_damage_frac)/(1+par.r)*dP_C_prime,0)

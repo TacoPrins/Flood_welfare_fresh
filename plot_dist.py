@@ -16,6 +16,8 @@ Reduced sheets (see create_plotting_inputs.py):
   grids    : vTime, vM_sim, vH, vL_sim, vX_sim
 """
 
+import os
+import logging
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,6 +25,24 @@ import matplotlib.pyplot as plt
 K_LABEL = {0: "Realist", 1: "Sceptic"}
 _VAR_GRID = {"l": "vL_sim", "m": "vM_sim", "h": "vH"}
 _LOC_NAME = {"C": "Coastal", "NC": "Non-coastal"}
+
+# where every figure is saved (as .png and .eps); set SAVE_FIGS = False to only show them
+OUT_DIR = r"C:\Users\TPRINS\OneDrive - UvA\Documenten\Python files\New coding round July 2026\Plaatjes"
+SAVE_FIGS = True
+# .eps has no transparency: slightly transparent lines are drawn opaque; silence that warning
+logging.getLogger("matplotlib.backends.backend_ps").setLevel(logging.ERROR)
+
+# income level 1 -> 5: one blue hue, light -> dark (same as the welfare plots)
+INCOME_COLORS = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b"]
+
+
+def _save(fig, name):
+    """Save fig to OUT_DIR as name.png and name.eps."""
+    if not SAVE_FIGS:
+        return
+    os.makedirs(OUT_DIR, exist_ok=True)
+    for ext in ("png", "eps"):
+        fig.savefig(os.path.join(OUT_DIR, f"{name}.{ext}"), dpi=300, bbox_inches="tight")
 
 
 # ---------- small numeric helpers (unchanged in spirit) ----------
@@ -87,6 +107,7 @@ def plot_tenure_shares(masses, tag, vTime=None):
         ax[j].set_xlabel("t"); ax[j].set_ylim(0, 1)
     ax[0].set_ylabel("Population share"); ax[0].legend(loc="lower left", fontsize=8)
     plt.tight_layout()
+    _save(fig, f"tenure_shares_{tag}")
     return ax
 
 
@@ -105,6 +126,7 @@ def plot_coastal_share_lines(masses, tag, vTime=None):
     ax[0].set_title("Coastal share of owners"); ax[1].set_title("Homeownership rate")
     for a in ax: a.set_xlabel("t"); a.legend()
     plt.tight_layout()
+    _save(fig, f"coastal_share_lines_{tag}")
     return ax
 
 
@@ -138,6 +160,7 @@ def plot_conditional_dists(cond, grids, tag, loc, k, e_list=None,
     ax[0, 0].legend(fontsize=8)
     fig.suptitle(f"{_LOC_NAME[loc]} owners — {K_LABEL.get(k, k)} ({tag})")
     plt.tight_layout()
+    _save(fig, f"cond_dists_{tag}_{loc}_{K_LABEL[k].lower()}")
     return ax
 
 
@@ -163,6 +186,7 @@ def plot_renter_savings(renter, grids, tag, k_list=None, e_list=None,
     ax[0, 0].legend(fontsize=8)
     fig.suptitle(f"Renter savings $x$ ({tag})")
     plt.tight_layout()
+    _save(fig, f"renter_savings_{tag}")
     return ax
 
 
@@ -191,19 +215,10 @@ def plot_moment_paths(cond, grids, tag, loc, var="l", vTime=None):
 
     # Fixed y-axis ranges for comparability across all plots.
     y_limits = {
-        "l": (0, 0.8),  # LTV ratio
+        "l": (0, 0.9),  # LTV ratio
         "m": (0, 3.0),  # Savings
         "h": (0, 5.0),  # House size
     }
-
-    # Muted, colour-blind-friendly palette.
-    # The pooled mean is deliberately neutral and heavier.
-    palette = ["#4477AA", "#66CCEE", "#228833", "#CCBB44", "#EE6677"]
-
-    if E <= len(palette):
-        colours = palette[:E]
-    else:
-        colours = plt.cm.viridis(np.linspace(0.12, 0.88, E))
 
     axes = []
 
@@ -215,14 +230,11 @@ def plot_moment_paths(cond, grids, tag, loc, var="l", vTime=None):
             constrained_layout=True
         )
 
-        # Collect each income level's mass-carrying marginal (unnormalized).
-        margs = []
-
+        # One line per income level, light (1) -> dark (5), as in the welfare plots.
         for idx, e in enumerate(es):
             marg = _pivot_TN(
                 d[(d["k"] == k) & (d["e"] == e)]
             )
-            margs.append(marg)
 
             g = grid[:marg.shape[1]]
 
@@ -231,53 +243,20 @@ def plot_moment_paths(cond, grids, tag, loc, var="l", vTime=None):
                 for i in range(marg.shape[0])
             ])
 
-            sd = idx - (E - 1) / 2
-
-            sd_label = (
-                f"{sd:+.0f} SD"
-                if sd != 0
-                else "Median income"
-            )
-
-            ax.plot(
-                t[:len(mu)],
-                mu,
-                label=sd_label,
-                color=colours[idx],
-                lw=1.7,
-                alpha=0.95,
-            )
-
-        # Income-averaged mean: pool all income groups (mass-weighted).
-        pooled = np.sum(margs, axis=0)
-
-        g = grid[:pooled.shape[1]]
-
-        mu_all = np.array([
-            _wmean(g, pooled[i])
-            for i in range(pooled.shape[0])
-        ])
-
-        ax.plot(
-            t[:len(mu_all)],
-            mu_all,
-            label="All incomes (mass-weighted)",
-            color="#222222",
-            lw=2.6,
-            zorder=5,
-        )
+            ax.plot(t[:len(mu)], mu, color=INCOME_COLORS[idx], lw=2.2, label=str(idx + 1))
 
         # Title and axis labels.
         ax.set_title(
-            f"{_LOC_NAME.get(loc, loc)} owners · {belief} · {tag}",
+            f"{belief} owners "
+            f"{'flood-exposed' if loc == 'C' else 'non-flood-exposed'} housing",
             loc="left",
-            fontsize=11,
+            fontsize=18,
             fontweight="semibold",
             pad=10,
         )
 
-        ax.set_xlabel("Year")
-        ax.set_ylabel(f"Mean {var_name}")
+        ax.set_xlabel("Year", fontsize=18)
+        ax.set_ylabel(f"Mean {var_name}", fontsize=18)
 
         # Fixed y-axis range depending on variable.
         if var in y_limits:
@@ -313,25 +292,16 @@ def plot_moment_paths(cond, grids, tag, loc, var="l", vTime=None):
 
         ax.tick_params(
             axis="both",
-            labelsize=9,
+            labelsize=16,
             colors="#444444",
         )
 
         ax.margins(x=0.01)
 
-        # Put the legend outside the data region in two compact rows.
-        ax.legend(
-            title="Income group",
-            loc="upper center",
-            bbox_to_anchor=(0.5, -0.16),
-            ncol=3,
-            fontsize=8.5,
-            title_fontsize=8.5,
-            frameon=False,
-            handlelength=2.6,
-            columnspacing=1.4,
-        )
+        ax.legend(title="Income level", frameon=False, fontsize=15, title_fontsize=15,
+                  ncol=E, loc="upper center", bbox_to_anchor=(0.5, -0.2))  # below the axes
 
+        _save(fig, f"mean_{var_name.replace(' ', '_')}_{tag}_{loc}_{belief.lower()}")
         axes.append(ax)
 
     return axes
@@ -351,6 +321,7 @@ def plot_ltv_heatmap(ltv, grids, tag, loc, k, vTime=None):
     ax.set_xlabel("t"); ax.set_ylabel("LTV $l$")
     ax.set_title(f"{_LOC_NAME[loc]} — {K_LABEL.get(k, k)} ({tag})")
     plt.tight_layout()
+    _save(fig, f"ltv_heatmap_{tag}_{loc}_{K_LABEL[k].lower()}")
     return ax
 
 
@@ -391,17 +362,17 @@ def plot_default_rates(masses, defaults, tag, vTime=None):
     dnc = de["def_nc"].to_numpy()
 
     # Restrained, colour-blind-friendly colours.
-    palette = ["#4477AA", "#EE6677", "#228833", "#CCBB44"]
+    palette = ["tab:blue", "tab:orange", "tab:green", "tab:red"]   # matplotlib defaults
 
     # Location-specific inputs.
     specs = [
         {
-            "name": "Coastal",
+            "name": "flood-exposed",
             "defaults": dc,
             "mass": mc,
         },
         {
-            "name": "Non-coastal",
+            "name": "non-flood-exposed",
             "defaults": dnc,
             "mass": mnc,
         },
@@ -434,7 +405,7 @@ def plot_default_rates(masses, defaults, tag, vTime=None):
 
         # Title and axis labels.
         ax.set_title(
-            f"{spec['name']} owners · {tag}",
+            f"Owners {spec['name']} housing",
             loc="left",
             fontsize=11,
             fontweight="semibold",
@@ -495,9 +466,148 @@ def plot_default_rates(masses, defaults, tag, vTime=None):
             columnspacing=1.8,
         )
 
+        _save(fig, f"default_rates_{tag}_{spec['name'].replace('-', '_')}")
         axes.append(ax)
 
     return axes
+
+
+# ---------- 6) table: owner distribution over house size h ----------
+def print_h_table(cond, grids, tag, t=0, k=None):
+    """Owner mass on each h grid point (C, NC, total), as fractions of all owners at period t."""
+    d = cond[(cond["scenario"] == tag) & (cond["var"] == "h")]
+    if k is not None:
+        d = d[d["k"] == k]                                    # one belief type; default sums over k
+    t = t % (int(d["t"].max()) + 1)                           # allow t=-1
+    tab = d[d["t"] == t].pivot_table(index="i", columns="location",
+                                     values="value", aggfunc="sum")[["C", "NC"]]
+    tab["Total"] = tab["C"] + tab["NC"]
+    tab = tab / tab["Total"].sum()                            # fractions of all owners
+    tab.index = grids["vH"][:len(tab)]; tab.index.name = "h"
+    who = "all beliefs" if k is None else K_LABEL.get(k, k)
+    print(f"\nOwners over h — {tag}, t={t}, {who}")
+    print(pd.concat([tab, tab.sum().to_frame("Sum").T]).round(4).to_string())
+    return tab
+
+# ---------- 7) coastal share of owners by belief type ----------
+def plot_coastal_owner_share(masses, tag="HE"):
+    """Share of owners living in flood-exposed (coastal) housing, by belief type."""
+    d = masses[masses["scenario"] == tag]
+    piv = d.pivot_table(index="t", columns="k", values=["mc", "mnc"])
+    t = 1998 + 2 * piv.index.to_numpy()                      # calendar years
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.6), constrained_layout=True)
+    for k in sorted(d["k"].unique()):
+        mc, mnc = piv["mc"][k].to_numpy(), piv["mnc"][k].to_numpy()
+        ax.plot(t, _safe_div(mc, mc + mnc), lw=2.2, label=K_LABEL.get(k, f"k={k}"))
+
+    ax.set_title("Flood-exposed share of homeowners", loc="left",
+                 fontsize=18, fontweight="semibold", pad=10)
+    ax.set_xlabel("Year", fontsize=18)
+    ax.set_ylabel("Share of owners", fontsize=18)
+    ax.set_ylim(0, 1.02)                                     # keep lines at 1 fully visible
+    ax.set_xlim(t[0], t[-1])
+    ax.set_xticks([2000, 2020, 2040, 2060, 2080, 2100])
+    ax.grid(axis="y", color="#D9D9D9", lw=0.7, alpha=0.8)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color("#888888")
+    ax.tick_params(axis="both", labelsize=16, colors="#444444")
+    ax.legend(frameon=False, fontsize=16, loc="lower left")
+    _save(fig, f"coastal_owner_share_{tag}")
+    return ax
+
+
+# ---------- 8) coastal ownership, split by LTV ----------
+def plot_coastal_ltv_split(masses, ltv, grids, ltv_max=0.8):
+    """Share of all households of a type owning coastal housing, stacked into
+    LTV <= ltv_max (dark) and LTV > ltv_max (light); the top edge is P(coastal owner).
+    One figure per (scenario, belief type), all on the same y-axis."""
+    low = grids["vL_sim"] <= ltv_max
+    panels = [("HE", 0, "Realist owners", "HE_realist"),
+          ("HE", 1, "Sceptic owners", "HE_sceptic"),
+          ("RE", 0, "", "RE")]
+
+    axes = []
+    for tag, k, title, fname in panels:
+        m = masses[(masses["scenario"] == tag) & (masses["k"] == k)].sort_values("t")
+        tot = (m["mc"] + m["mnc"] + m["mr"]).to_numpy()          # all households of type k
+        w = _pivot_TN(ltv[(ltv["scenario"] == tag) & (ltv["location"] == "C") &
+                          (ltv["k"] == k)])                       # (T, nL) coastal owner mass
+        p_low = _safe_div(w[:, low[:w.shape[1]]].sum(axis=1), tot)
+        p_high = _safe_div(w[:, ~low[:w.shape[1]]].sum(axis=1), tot)
+        fig, ax = plt.subplots(figsize=(7.0, 4.6), constrained_layout=True)
+        _draw_ltv_split(ax, m["t"].to_numpy(), p_low, p_high, title, ltv_max)
+        _ltv_legend(ax)
+        _save(fig, f"coastal_ltv{round(100 * ltv_max)}_{fname}")
+        axes.append(ax)
+    return axes
+
+
+def plot_coastal_ltv_split_by_e(cond, renter, grids, ltv_max=0.8):
+    """As plot_coastal_ltv_split, but conditional on current income level e:
+    shares of all households of type k with income e (HE only).
+    One tall figure per belief type, income levels 1 (top) to 5 (bottom),
+    meant to sit side by side (realists | sceptics) in LaTeX."""
+    low = grids["vL_sim"] <= ltv_max
+    d = cond[(cond["scenario"] == "HE") & (cond["var"] == "l")]   # owner mass over LTV, by k, e
+    r = renter[renter["scenario"] == "HE"]
+    es = sorted(d["e"].unique())
+
+    figs = []
+    for k, name in [(0, "realist"), (1, "sceptic")]:
+        fig, axes = plt.subplots(len(es), 1, figsize=(7.0, 13.0), sharex=True,
+                                 constrained_layout=True)
+        for ax, e in zip(axes, es):
+            sel = (d["k"] == k) & (d["e"] == e)
+            w = _pivot_TN(d[sel & (d["location"] == "C")])        # (T, nL) coastal owner mass
+            tot = (w.sum(axis=1)                                   # all households of type k, income e
+                   + _pivot_TN(d[sel & (d["location"] == "NC")]).sum(axis=1)
+                   + _pivot_TN(r[(r["k"] == k) & (r["e"] == e)]).sum(axis=1))
+            p_low = _safe_div(w[:, low[:w.shape[1]]].sum(axis=1), tot)
+            p_high = _safe_div(w[:, ~low[:w.shape[1]]].sum(axis=1), tot)
+            _draw_ltv_split(ax, np.arange(len(tot)), p_low, p_high,
+                            f"Income level {e + 1}", ltv_max)
+        for ax in axes[:-1]:
+            ax.set_xlabel("")                                      # "Year" only on the bottom panel
+        _ltv_legend(axes[-1], y=-0.38)
+        _save(fig, f"coastal_ltv{round(100 * ltv_max)}_HE_{name}_by_income")
+        figs.append(fig)
+    return figs
+
+
+def _ltv_legend(ax, y=-0.2):
+    """Section 8 legend below the axes, ordered top -> bottom of the stack."""
+    h, lab = ax.get_legend_handles_labels()
+    ax.legend(h[::-1], lab[::-1], frameon=False,
+              fontsize=14, title_fontsize=14, ncol=3,
+              loc="upper center", bbox_to_anchor=(0.5, y))
+
+
+def _draw_ltv_split(ax, tt, p_low, p_high, title, ltv_max):
+    """Shared look for section 8 on one axis: stacked bands + top line,
+    model period tt -> calendar year."""
+    dark, light, edge = "#1c5cab", "#86b6ef", "#0d366b"   # one blue hue
+    thr = f"{ltv_max:g}"
+    ok = ~np.isnan(p_low)                                    # drop periods with no mass
+    t = 1998 + 2 * tt[ok]
+
+    ax.stackplot(t, p_low[ok], p_high[ok], colors=[dark, light],
+                 labels=[f"LTV ≤ {thr}", f"LTV > {thr}"],
+                 edgecolor="white", linewidth=1.0)
+    ax.plot(t, p_low[ok] + p_high[ok], color=edge, lw=2.0, label="All")
+
+    ax.set_title(title, loc="left", fontsize=18, fontweight="semibold", pad=10)
+    ax.set_xlabel("Year", fontsize=18)
+    ax.set_ylabel("Probability", fontsize=18)
+    ax.set_ylim(0, 1)
+    ax.set_xlim(1998, 1998 + 2 * tt.max())
+    ax.set_xticks([2000, 2020, 2040, 2060, 2080, 2100])
+    ax.grid(axis="y", color="#D9D9D9", lw=0.7, alpha=0.8)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color("#888888")
+    ax.tick_params(axis="both", labelsize=16, colors="#444444")
 
 
 # ---------- driver ----------
@@ -530,6 +640,12 @@ def plot_all_distributions(path="plotting_inputs.xlsx"):
 
         # 5) default rates
         plot_default_rates(masses, defaults, tag, vTime)
+
+    plot_coastal_owner_share(masses, "HE")
+
+    # 8) coastal ownership split by LTV (threshold 0.8), aggregate and by income level
+    plot_coastal_ltv_split(masses, ltv, grids, 0.8)
+    plot_coastal_ltv_split_by_e(cond, renter, grids, 0.8)
 
     plt.show()
 

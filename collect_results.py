@@ -81,13 +81,14 @@ def collect_results(plot_distribution, calculate_welfare):
     ### Plot 2026 dist
     ############################################################################"""
   
-    price_history, mDist1_c_2026, mDist1_nc_2026, mDist1_renter_2026, rental_stock_C_2026, rental_stock_NC_2026, _, _, _, _, _, _, _, _, _, _, _, _, _, _=equil.generate_pricepath(grids, par, C["vCoeff_C_HE"], C["vCoeff_NC_HE"], dP_C_initial, dP_NC_initial, mDist1_c_SS, mDist1_nc_SS, mDist1_renter_SS, rental_stock_C0, rental_stock_NC0, coastal_beq0, noncoastal_beq0, savings_beq0, cfg.path_until_experiment)
-        
-    del mDist1_c_SS, mDist1_nc_SS, mDist1_renter_SS
+    
     """############################################################################
     ### START EXPERIMENTS
     ############################################################################"""
     if calculate_welfare:
+        price_history, mDist1_c_2026, mDist1_nc_2026, mDist1_renter_2026, rental_stock_C_2026, rental_stock_NC_2026, _, _, _, _, _, _, _, _, _, _, _, _, _, _=equil.generate_pricepath(grids, par, C["vCoeff_C_HE"], C["vCoeff_NC_HE"], dP_C_initial, dP_NC_initial, mDist1_c_SS, mDist1_nc_SS, mDist1_renter_SS, rental_stock_C0, rental_stock_NC0, coastal_beq0, noncoastal_beq0, savings_beq0, cfg.path_until_experiment)
+            
+        del mDist1_c_SS, mDist1_nc_SS, mDist1_renter_SS
         "(4) + (5) welfare effects of policy: building restrictions and mortgage premium"
         print("start with welfare of policy")
         tax_equiv_C_MP, tax_equiv_NC_MP, tax_equiv_renter_MP, tax_equiv_newborns_MP,tax_equiv_C_BR, tax_equiv_NC_BR, tax_equiv_renter_BR, tax_equiv_newborns_BR = welfare_stats.find_expenditure_equiv_EK_policy(par, grids, C["vCoeff_C_HE"], C["vCoeff_NC_HE"],C["vCoeff_C_MP"], C["vCoeff_NC_MP"], C["vCoeff_C_BR"], C["vCoeff_NC_BR"], mDist1_c_2026, mDist1_nc_2026, mDist1_renter_2026, vcoastal_beq, vnoncoastal_beq, vsavings_beq, cfg.transition_path, cfg.experiment_mortgage_prem, cfg.experiment_building_rest)

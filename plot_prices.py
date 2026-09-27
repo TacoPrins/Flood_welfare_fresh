@@ -33,7 +33,7 @@ def plot_pricepaths(
     normalisation = vCoeff_NC_initial[0]
 
     plt.style.use("seaborn-v0_8-whitegrid")
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(7.0, 4.6))
 
     T = len(grids.vTime)
     t_indices = np.arange(T)
@@ -86,23 +86,23 @@ def plot_pricepaths(
     plt.scatter([x0_year], [y_coastal], zorder=5)
     plt.scatter([x0_year], [y_inland], zorder=5)
 
-    plt.annotate(
-        "Initial flood-exposed price",
-        (x0_year, y_coastal),
-        xytext=(10, 10),
-        textcoords="offset points",
-        ha="center",
-        fontsize=9,
-    )
+    #plt.annotate(
+    #    "Initial flood-exposed price",
+    #    (x0_year, y_coastal),
+    #    xytext=(10, 10),
+    #    textcoords="offset points",
+    #    ha="center",
+    #    fontsize=9,
+    #)
 
-    plt.annotate(
-        "Initial inland price",
-        (x0_year, y_inland),
-        xytext=(10, 10),
-        textcoords="offset points",
-        ha="center",
-        fontsize=9,
-    )
+    #plt.annotate(
+    #    "Initial inland price",
+    #    (x0_year, y_inland),
+    #    xytext=(10, 10),
+    #    textcoords="offset points",
+    #    ha="center",
+    #    fontsize=9,
+    #)
 
     # Terminal prices
     xT_year = years[-1]
@@ -131,23 +131,23 @@ def plot_pricepaths(
         zorder=5,
     )
 
-    plt.annotate(
-        "Terminal flood-exposed price",
-        (xT_year, yC_terminal_HE),
-        xytext=(-10, 10),
-        textcoords="offset points",
-        ha="right",
-        fontsize=9,
-    )
+    #plt.annotate(
+    #    "Terminal flood-exposed price",
+    #    (xT_year, yC_terminal_HE),
+    #    xytext=(-10, 10),
+    #    textcoords="offset points",
+    #    ha="right",
+    #    fontsize=9,
+    #)
 
-    plt.annotate(
-        "Terminal inland price",
-        (xT_year, yNC_terminal_HE),
-        xytext=(-10, 10),
-        textcoords="offset points",
-        ha="right",
-        fontsize=9,
-    )
+    #plt.annotate(
+    #    "Terminal inland price",
+    #    (xT_year, yNC_terminal_HE),
+    #    xytext=(-10, 10),
+    #    textcoords="offset points",
+    #    ha="right",
+    #    fontsize=9,
+    #)
 
     plt.vlines(x0_year, y_coastal, yC_HE[0],
                linestyles="dotted", linewidth=1)
@@ -157,10 +157,11 @@ def plot_pricepaths(
     xticks = np.arange(int(years[0]), int(years[-1]) + 1, 20)
     plt.xticks(xticks)
 
-    plt.xlabel("Year")
-    plt.ylabel("Price")
-    plt.title("House price trajectories")
-    plt.legend(frameon=False)
+    plt.xlabel("Year", fontsize=18)
+    plt.ylabel("Price", fontsize=18)
+    plt.title("House price trajectories", fontsize=18)
+    plt.tick_params(labelsize=16)
+    plt.legend(frameon=False, fontsize=16)
     plt.grid(True, linestyle="--", alpha=0.4)
 
     plt.tight_layout()
@@ -277,6 +278,67 @@ def plot_price_transition_exp(
 
         plt.tight_layout()
         plt.show()
+        
+def rental_price(par, grids, t_index, P, P_prime, coastal):
+    """User-cost rent given this period's price P and next period's price P_prime."""
+    dmg = grids.vPi_S_median[t_index] * np.dot(grids.vPDF_z[1:], 1 - grids.vZ[1:]) if coastal else 0.0
+    return par.dPsi + max(P - (1 - par.dDelta - dmg) / (1 + par.r) * P_prime, 0)
+
+
+def rent_path(par, grids, vCoeff, coastal):
+    """Rents along the transition; price is held constant in the last period (P' = P)."""
+    T = len(grids.vTime)
+    P = [lom.LoM(par, grids, t, vCoeff) for t in range(T)]
+    P.append(P[-1])
+    return np.array([rental_price(par, grids, t, P[t], P[t + 1], coastal) for t in range(T)])
+
+def plot_rentpaths(par, grids, vCoeff_C_initial, vCoeff_NC_initial, vCoeff_C, vCoeff_NC,
+                   vCoeff_C_RE, vCoeff_NC_RE, vCoeff_C_terminal_RE, vCoeff_NC_terminal_RE,
+                   vCoeff_C_terminal_HE, vCoeff_NC_terminal_HE, end_year=2100):
+    
+    P0_NC = lom.LoM(par, grids, 0, vCoeff_NC_initial)
+    normalisation = rental_price(par, grids, 0, P0_NC, P0_NC, False)   # initial inland rent                 # same as price graph
+    T = len(grids.vTime)
+    years = par.starting_year + par.time_increment * np.arange(T)
+    n = int((end_year - par.starting_year) / par.time_increment) + 1   # periods up to end_year
+    years = years[:n]
+    plt.style.use("seaborn-v0_8-whitegrid")
+    plt.figure(figsize=(7.0, 4.6))
+
+    specs = [  # (coastal, HE, HE terminal, RE, RE terminal, initial, name)
+        (True,  vCoeff_C,  vCoeff_C_terminal_HE,  vCoeff_C_RE,  vCoeff_C_terminal_RE,  vCoeff_C_initial,  "flood-exposed"),
+        (False, vCoeff_NC, vCoeff_NC_terminal_HE, vCoeff_NC_RE, vCoeff_NC_terminal_RE, vCoeff_NC_initial, "inland"),
+    ]
+    for coastal, cHE, cHE_T, cRE, cRE_T, c0, name in specs:
+        rHE = rent_path(par, grids, cHE, coastal)[:n] / normalisation
+        rRE = rent_path(par, grids, cRE, coastal)[:n] / normalisation
+        P0 = lom.LoM(par, grids, 0, c0)                       # initial steady state: P' = P
+        PT = lom.LoM(par, grids, T - 1, cHE_T)                # terminal steady state: P' = P
+        r0 = rental_price(par, grids, 0, P0, P0, coastal) / normalisation
+        rT = rental_price(par, grids, T - 1, PT, PT, coastal) / normalisation
+
+        line, = plt.plot(years, rRE, linestyle=":", linewidth=2)
+        col = line.get_color()
+        plt.plot(years, rHE, linewidth=2, color=col, label=f"{name.capitalize()} rent trajectory")
+
+        plt.scatter([years[0]], [r0], color=col, zorder=5)
+        #plt.annotate(f"Initial {name} rent", (years[0], r0), xytext=(10, 10),
+        #             textcoords="offset points", ha="center", fontsize=9)
+        plt.vlines(years[0], r0, rHE[0], linestyles="dotted", linewidth=1)
+
+        plt.scatter([years[-1]], [rT], color=col, zorder=5)
+        #plt.annotate(f"Terminal {name} rent", (years[-1], rT), xytext=(-10, 10),
+        #             textcoords="offset points", ha="right", fontsize=9)
+
+    plt.xticks(np.arange(int(years[0]), int(years[-1]) + 1, 20))
+    plt.xlabel("Year", fontsize=18)
+    plt.ylabel("Rent", fontsize=18)
+    plt.title("Rental price trajectories", fontsize=18)
+    plt.tick_params(labelsize=16)
+    plt.legend(frameon=False, fontsize=16)
+    plt.grid(True, linestyle="--", alpha=0.4)
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -332,3 +394,10 @@ if __name__ == "__main__":
         title="House price transition: building restriction experiment",
         switch_index=14,
     )
+    
+    plot_rentpaths(par, grids,
+       C["vCoeff_C_initial_HE"], C["vCoeff_NC_initial_HE"],
+       C["vCoeff_C_HE"], C["vCoeff_NC_HE"],
+       C["vCoeff_C_RE"], C["vCoeff_NC_RE"],
+       C["vCoeff_C_terminal_RE"], C["vCoeff_NC_terminal_RE"],
+       C["vCoeff_C_terminal_HE"], C["vCoeff_NC_terminal_HE"])

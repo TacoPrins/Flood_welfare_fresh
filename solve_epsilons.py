@@ -8,15 +8,17 @@ Purpose:
 ### Imports
 import solve_model as solve_model
 import collect_results
-
-        
+import grid_creation
+import par_epsilons as parfile
+import misc_functions as misc 
 ###########################################################
 ### main
 def main():
-    plot_distribution=True
-    calculate_welfare=False    
+    plot_distribution=False
+    calculate_welfare=True    
     welfare_out = collect_results.collect_results(plot_distribution, calculate_welfare)
-    #solve_model.solve()
+
+  
 ###########################################################
 
 ### start main
