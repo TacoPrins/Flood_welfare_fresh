@@ -168,117 +168,70 @@ def plot_pricepaths(
     plt.show()
     
 def plot_price_transition_exp(
+        par,
+        grids,
         vCoeff_C_initial,
         vCoeff_NC_initial,
         vCoeff_C_baseline,
         vCoeff_NC_baseline,
-        vCoeff_C_experiment,
-        vCoeff_NC_experiment,
-        par,
-        grids,
-        title,
+        experiments,
         switch_index=14,
     ):
-        T = len(grids.vTime)
-        t_indices = np.arange(T)
-        years = par.starting_year + par.time_increment * t_indices
+    """House prices with a policy introduced at switch_index: one separate figure per
+    experiment, in the look of plot_pricepaths, all on the same y-range so they can be
+    placed side by side. experiments: list of (title, vCoeff_C_experiment, vCoeff_NC_experiment).
+    Prices are normalised by the initial inland price, as in plot_pricepaths.
+    After the switch, the price without the policy is shown as a dotted line."""
+    normalisation = vCoeff_NC_initial[0]      # initial inland price, as in plot_pricepaths
 
-        P_C_base = np.array([
-            lom.LoM(par, grids, t_index, vCoeff_C_baseline)
-            for t_index in t_indices
-        ])
+    T = len(grids.vTime)
+    t_indices = np.arange(T)
+    years = par.starting_year + par.time_increment * t_indices
+    s = switch_index
 
-        P_NC_base = np.array([
-            lom.LoM(par, grids, t_index, vCoeff_NC_baseline)
-            for t_index in t_indices
-        ])
+    def path(vCoeff):
+        return np.array([lom.LoM(par, grids, t_index, vCoeff) for t_index in t_indices]) / normalisation
 
-        P_C_exp = np.array([
-            lom.LoM(par, grids, t_index, vCoeff_C_experiment)
-            for t_index in t_indices
-        ])
+    base = {"C": path(vCoeff_C_baseline), "NC": path(vCoeff_NC_baseline)}
+    initial = {"C": lom.LoM(par, grids, 0, vCoeff_C_initial) / normalisation,
+               "NC": lom.LoM(par, grids, 0, vCoeff_NC_initial) / normalisation}
+    exps = [(title, {"C": path(cC), "NC": path(cNC)}) for title, cC, cNC in experiments]
+    series = [("C", "tab:blue", "Flood-exposed"), ("NC", "tab:orange", "Inland")]
 
-        P_NC_exp = np.array([
-            lom.LoM(par, grids, t_index, vCoeff_NC_experiment)
-            for t_index in t_indices
-        ])
+    # common y-range for all experiment figures
+    values = np.concatenate([base["C"], base["NC"], [initial["C"], initial["NC"]]]
+                            + [e[loc] for _, e in exps for loc in ("C", "NC")])
+    pad = 0.05 * (values.max() - values.min())
+    ylim = (values.min() - pad, values.max() + pad)
 
-        P_C_initial = lom.LoM(par, grids, 0, vCoeff_C_initial)
-        P_NC_initial = lom.LoM(par, grids, 0, vCoeff_NC_initial)
+    plt.style.use("seaborn-v0_8-whitegrid")
+    for title, exp in exps:
+        plt.figure(figsize=(7.0, 4.6))
+        for loc, color, name in series:
+            b, e = base[loc], exp[loc]
+            plt.plot(years[:s + 1], b[:s + 1], linewidth=2, color=color, label=name)   # before the policy
+            plt.plot(years[s:], e[s:], linewidth=2, color=color)                       # with the policy
+            plt.plot(years[s:], b[s:], linewidth=2, linestyle=":", color=color)        # without the policy
+            plt.vlines(years[0], initial[loc], b[0], linestyles="dotted", linewidth=1, color=color)  # jump in 1998
+            plt.vlines(years[s], b[s], e[s], linestyles="dotted", linewidth=1, color=color)          # jump at the switch
+            plt.scatter([years[0], years[s], years[s], years[-1]],
+                        [initial[loc], b[s], e[s], e[-1]], color=color, zorder=5)
+        plt.axvline(years[s], linestyle=":", linewidth=1, color="0.5")
+        plt.plot([], [], linewidth=2, linestyle=":", color="0.3", label="Without policy")   # legend entry only
 
-        year0 = years[0]
-        switch_year = years[switch_index]
-        final_year = years[-1]
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-
-        color_C = "tab:blue"
-        color_NC = "tab:orange"
-
-        # Flood-exposed C
-        ax.scatter(year0, P_C_initial, marker="o", color=color_C)
-        ax.scatter(year0, P_C_base[0], marker="o", color=color_C)
-        ax.plot([year0, year0], [P_C_initial, P_C_base[0]],
-                linestyle="--", color=color_C)
-
-        ax.plot(years[:switch_index + 1],
-                P_C_base[:switch_index + 1],
-                color=color_C,
-                label="Flood-exposed")
-
-        ax.scatter(switch_year, P_C_base[switch_index],
-                   marker="o", color=color_C)
-        ax.scatter(switch_year, P_C_exp[switch_index],
-                   marker="o", color=color_C)
-
-        ax.plot([switch_year, switch_year],
-                [P_C_base[switch_index], P_C_exp[switch_index]],
-                linestyle="--", color=color_C)
-
-        ax.plot(years[switch_index:],
-                P_C_exp[switch_index:],
-                color=color_C)
-
-        ax.scatter(final_year, P_C_exp[-1], marker="o", color=color_C)
-
-        # Non-flood-exposed NC
-        ax.scatter(year0, P_NC_initial, marker="s", color=color_NC)
-        ax.scatter(year0, P_NC_base[0], marker="s", color=color_NC)
-        ax.plot([year0, year0], [P_NC_initial, P_NC_base[0]],
-                linestyle="--", color=color_NC)
-
-        ax.plot(years[:switch_index + 1],
-                P_NC_base[:switch_index + 1],
-                color=color_NC,
-                label="Non-flood-exposed")
-
-        ax.scatter(switch_year, P_NC_base[switch_index],
-                   marker="s", color=color_NC)
-        ax.scatter(switch_year, P_NC_exp[switch_index],
-                   marker="s", color=color_NC)
-
-        ax.plot([switch_year, switch_year],
-                [P_NC_base[switch_index], P_NC_exp[switch_index]],
-                linestyle="--", color=color_NC)
-
-        ax.plot(years[switch_index:],
-                P_NC_exp[switch_index:],
-                color=color_NC)
-
-        ax.scatter(final_year, P_NC_exp[-1], marker="s", color=color_NC)
-
-        ax.axvline(switch_year, linestyle=":", linewidth=1, color="black")
-
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Price")
-        ax.set_title(title)
-        ax.legend()
-        ax.set_ylim(0.4, 0.85)
-        ax.grid(True, alpha=0.3)
+        plt.xticks(np.arange(int(years[0]), int(years[-1]) + 1, 20))
+        plt.ylim(*ylim)
+        plt.xlabel("Year", fontsize=18)
+        plt.ylabel("Price", fontsize=18)
+        plt.title(title, fontsize=18)
+        plt.tick_params(labelsize=16)
+        plt.legend(frameon=False, fontsize=16)
+        plt.grid(True, linestyle="--", alpha=0.4)
 
         plt.tight_layout()
         plt.show()
-        
+
+
 def rental_price(par, grids, t_index, P, P_prime, coastal):
     """User-cost rent given this period's price P and next period's price P_prime."""
     dmg = grids.vPi_S_median[t_index] * np.dot(grids.vPDF_z[1:], 1 - grids.vZ[1:]) if coastal else 0.0
@@ -367,31 +320,16 @@ if __name__ == "__main__":
         C["vCoeff_NC_terminal_HE"],
     )
 
-    # Mortgage premium experiment
+    # Policy experiments: one figure each, same y-range (to place side by side in LaTeX)
     plot_price_transition_exp(
+        par,
+        grids,
         C["vCoeff_C_initial_HE"],
         C["vCoeff_NC_initial_HE"],
         C["vCoeff_C_HE"],
         C["vCoeff_NC_HE"],
-        C["vCoeff_C_MP"],
-        C["vCoeff_NC_MP"],
-        par,
-        grids,
-        title="House price transition: mortgage premium experiment",
-        switch_index=14,
-    )
-
-    # Building restriction experiment
-    plot_price_transition_exp(
-        C["vCoeff_C_initial_HE"],
-        C["vCoeff_NC_initial_HE"],
-        C["vCoeff_C_HE"],
-        C["vCoeff_NC_HE"],
-        C["vCoeff_C_BR"],
-        C["vCoeff_NC_BR"],
-        par,
-        grids,
-        title="House price transition: building restriction experiment",
+        [("Building standards", C["vCoeff_C_BR"], C["vCoeff_NC_BR"]),
+         ("Mortgage premium", C["vCoeff_C_MP"], C["vCoeff_NC_MP"])],
         switch_index=14,
     )
     
